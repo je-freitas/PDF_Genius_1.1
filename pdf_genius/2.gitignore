@@ -1,0 +1,286 @@
+require('dotenv').config();
+// Mensagem de saudação
+Swal.fire({
+    title: 'Bem-vindo!',
+    text: 'Estamos felizes em ter você aqui.',
+    icon: 'success',
+    confirmButtonText: 'Obrigado'
+});
+
+let pdfText = '';
+const fileInput = document.getElementById('pdf_upload');
+const uploadButton = document.getElementById('uploadButton');
+const resultContainer = document.getElementById('result');
+const loadingMessage = document.getElementById('loadingMessage');
+const searchButton = document.getElementById('searchButton');
+const searchInput = document.getElementById('searchInput');
+const askButton = document.getElementById('askButton');
+const answerOutput = document.getElementById('answerOutput');
+const loadingBarContainer = document.getElementById('loadingBarContainer');
+const loadingBar = document.getElementById('loadingBar');
+const searchLoading = document.getElementById('searchLoading');
+const searchLoadingBarContainer = document.getElementById('searchLoadingBarContainer');
+const searchLoadingBar = document.getElementById('searchLoadingBar');
+
+// Função para manipular o arquivo PDF
+function handleFile() {
+    const file = fileInput.files[0];
+    if (!file) {
+        Swal.fire({
+            title: 'Aviso',
+            text: 'Por favor, selecione um arquivo PDF.',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+
+    if (file.type !== 'application/pdf') {
+        Swal.fire({
+            title: 'Aviso',
+            text: 'O arquivo selecionado não é um PDF.',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function() {
+        const pdfData = new Uint8Array(this.result);
+
+        // Exibir mensagem de carregamento e a barra de carregamento
+        loadingMessage.classList.remove('hidden');
+        loadingBarContainer.classList.remove('hidden');
+        loadingBar.style.width = '0%';
+
+        pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
+            console.log('PDF carregado com sucesso.');
+            const numPages = pdf.numPages;
+            let pagePromises = [];
+            let loadedPages = 0;
+
+            // Iterar por todas as páginas
+            for (let i = 1; i <= numPages; i++) {
+                pagePromises.push(
+                    pdf.getPage(i).then(page => {
+                        return page.getTextContent().then(textContent => {
+                            loadedPages++;
+                            const progress = Math.round((loadedPages / numPages) * 100);
+                            loadingBar.style.width = `${progress}%`;
+                            return textContent.items.map(item => item.str).join(' ');
+                        });
+                    })
+                );
+            }
+
+            // Esperar que todas as promessas sejam resolvidas
+            Promise.all(pagePromises).then(pagesText => {
+                pdfText = pagesText.join(' '); // Juntar o texto de todas as páginas
+                console.log('Texto extraído do PDF:', pdfText);
+
+                // Ocultar mensagem de carregamento e liberar a pesquisa
+                loadingMessage.classList.add('hidden');
+                loadingBarContainer.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+                searchButton.disabled = false; // Ativar o botão de pesquisa
+
+                Swal.fire({
+                    title: 'Sucesso',
+                    text: 'Texto extraído com sucesso. Você pode fazer a pesquisa agora.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+            }).catch(error => {
+                console.error('Erro ao processar o texto das páginas:', error);
+                Swal.fire({
+                    title: 'Erro',
+                    text: 'Erro ao processar o texto das páginas. Veja o console para detalhes.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            });
+        }).catch(error => {
+            console.error('Erro ao carregar o PDF:', error);
+            Swal.fire({
+                title: 'Erro',
+                text: 'Erro ao carregar o PDF. Veja o console para detalhes.',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        });
+    };
+
+    reader.onerror = function(error) {
+        console.error('Erro ao ler o arquivo:', error);
+        Swal.fire({
+            title: 'Erro',
+            text: 'Erro ao ler o arquivo. Veja o console para detalhes.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+// Função para pesquisar no texto do PDF
+function searchPDF(query) {
+    if (!pdfText) {
+        Swal.fire({
+            title: 'Aviso',
+            text: 'Nenhum texto do PDF carregado. Por favor, faça o upload de um PDF primeiro.',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+
+    const lowerCaseQuery = query.toLowerCase();
+    const lowerCaseText = pdfText.toLowerCase();
+    const results = [];
+    let index = lowerCaseText.indexOf(lowerCaseQuery);
+
+    while (index !== -1) {
+        results.push(index);
+        index = lowerCaseText.indexOf(lowerCaseQuery, index + 1);
+    }
+
+    if (results.length > 0) {
+        displaySearchResults(results, query);
+    } else {
+        document.getElementById('searchResult').innerHTML = 'Nenhum texto encontrado.';
+    }
+}
+function displaySearchResults(results, query) {
+    const contextLength = 150;
+    let highlightedText = '';
+
+    results.forEach((position, index) => {
+        const start = Math.max(position - contextLength, 0);
+        const end = Math.min(position + query.length + contextLength, pdfText.length);
+        const before = pdfText.slice(start, position);
+        const match = pdfText.slice(position, position + query.length);
+        const after = pdfText.slice(position + query.length, end);
+
+        highlightedText += `
+            <div class="search-result" data-index="${index}">
+                <span>${before}<mark>${match}</mark>${after}</span>
+            </div>
+        `;
+    });
+    function setupNavigation(totalResults) {
+        const results = document.querySelectorAll('.search-result');
+        let currentIndex = 0;
+    
+        function navigateTo(index) {
+            if (index >= 0 && index < results.length) {
+                const result = results[index];
+                result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                currentIndex = index;
+            }
+        }
+    
+        // Inicializa a navegação no primeiro resultado
+        navigateTo(currentIndex);
+    
+        // Navegação com botões (se adicionados)
+        document.getElementById('nextButton').addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % totalResults;
+            navigateTo(currentIndex);
+        });
+    
+        document.getElementById('prevButton').addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + totalResults) % totalResults;
+            navigateTo(currentIndex);
+        });
+    }
+    
+
+    document.getElementById('searchResult').innerHTML = highlightedText;
+    setupNavigation(results.length);
+}
+
+
+    // Exibe resultado da pesquisa
+    Swal.fire({
+        title: 'Resultado da Pesquisa',
+        text: result,
+        icon: result === 'Texto encontrado no PDF.' ? 'success' : 'info',
+        confirmButtonText: 'OK'
+    });
+
+    // Se texto encontrado, exibe o texto realçado
+    if (result === 'Texto encontrado no PDF.') {
+        const context = getContextAroundText(pdfText, lowerCaseQuery, 150);
+        document.getElementById('searchResult').innerHTML = context;
+        searchLoading.classList.add('hidden');
+        searchLoadingBarContainer.classList.add('hidden');
+    } else {
+        document.getElementById('searchResult').innerHTML = 'Nenhum texto encontrado.';
+        searchLoading.classList.add('hidden');
+        searchLoadingBarContainer.classList.add('hidden');
+    }
+
+
+// Função para obter o contexto ao redor do texto buscado
+function getContextAroundText(text, query, charsAround) {
+    const lowerCaseText = text.toLowerCase();
+    const index = lowerCaseText.indexOf(query);
+    if (index === -1) return '';
+
+    const start = Math.max(0, index - charsAround);
+    const end = Math.min(text.length, index + query.length + charsAround);
+    return `<span>${text.substring(start, end).replace(new RegExp(`(${query})`, 'gi'), '<mark>$1</mark>')}</span>`;
+}
+
+// Função para obter resposta da API da OpenAI
+async function getAnswerFromAPI(question) {
+    const apiKey = process.env.API_KEY;
+
+    const url = 'https://api.openai.com/v1/completions'; // Ajuste para o endpoint correto
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            prompt: `Texto do PDF: ${pdfText}\nPergunta: ${question}\nResposta:`,
+            max_tokens: 150,
+            model: 'text-davinci-003' // Ou o modelo que você estiver usando
+        })
+    });
+
+    const data = await response.json();
+    return data.choices[0].text.trim();
+}
+
+// Inicialmente desativar o botão de pesquisa
+searchButton.disabled = true;
+
+// Adicionar evento de clique no botão de upload
+uploadButton.addEventListener('click', handleFile);
+
+// Adicionar evento de clique no botão de pesquisa
+searchButton.addEventListener('click', function() {
+    const query = searchInput.value;
+    searchPDF(query);
+});
+
+// Adicionar evento de clique no botão de pergunta
+askButton.addEventListener('click', async function() {
+    const question = searchInput.value;
+    if (!pdfText) {
+        Swal.fire({
+            title: 'Aviso',
+            text: 'Nenhum texto do PDF carregado. Por favor, faça o upload de um PDF primeiro.',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+    const answer = await getAnswerFromAPI(question);
+    answerOutput.textContent = answer;
+});

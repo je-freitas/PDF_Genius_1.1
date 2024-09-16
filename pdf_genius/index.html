@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Genius</title>
+    <link rel="stylesheet" href="style.css"> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.6.172/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="main.js" defer></script>
+</head>
+<body>
+    <header>
+        <h1>PDF GENIUS</h1>
+    </header>
+    <div class="pdf-upload"> 
+        <main>
+            <h2>Faça o upload do seu PDF</h2>
+            <label for="pdf_upload">Selecione o arquivo:</label>
+            <input type="file" id="pdf_upload" accept="application/pdf"> 
+            <br><br>
+            <button id="uploadButton">Enviar PDF</button>
+            
+            <!-- Elementos para a exibição de mensagens e barra de carregamento -->
+            <p id="loadingMessage" class="hidden">Carregando PDF...</p>
+            <div id="loadingBarContainer" class="hidden">
+                <div id="loadingBar"></div>
+            </div>
+            <div id="result"></div>
+
+            <!-- Campo de pergunta -->
+            <div class="question-section">
+                <h2>Faça uma pergunta sobre o PDF</h2>
+                <input type="text" id="questionInput" placeholder="Digite sua pergunta aqui">
+                <button id="askButton">Perguntar</button>
+                <p id="askLoading" class="hidden">Carregando resposta...</p>
+                <div id="askLoadingBarContainer" class="hidden">
+                    <div id="askLoadingBar"></div>
+                </div>
+                <p id="answerOutput"></p>
+            </div>
+            
+            <!-- Campo de busca -->
+            <div class="search-section">
+                <input type="text" id="searchInput" placeholder="Digite o termo de pesquisa">
+                <button id="searchButton">Buscar</button>
+                <p id="searchLoading" class="hidden">Buscando...</p>
+                <div id="searchLoadingBarContainer" class="hidden">
+                    <div id="searchLoadingBar" class="loading-bar"></div>
+                </div>
+                <div id="searchResult"></div>
+                <button id="prevButton">Anterior</button>
+                <button id="nextButton">Próximo</button>
+            </div>
+        </main>
+    </div>
+    <footer>
+        <p>&copy; 2024 PDF Genius</p>
+        <p>Contate-nos: <a href="mailto:jf.scheffer@hotmail.com">jf.scheffer@hotmail.com</a></p>
+    </footer>
+</body>
+</html>
